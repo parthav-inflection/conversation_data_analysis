@@ -296,7 +296,9 @@ class StratifiedQualityAnalyzer:
             print(f"Total conversation IDs collected: {len(all_conversation_ids):,}")
             
             # Process in batches with progress tracking  
-            batch_size = 10000  # Reduced due to database performance issues
+            batch_size = min(5000, len(all_conversation_ids) // 10)  # Conservative batch size, max 5K
+            batch_size = max(1000, batch_size)  # But at least 1K for efficiency
+            print(f"Using batch size: {batch_size:,} conversations per batch")
             processed = 0
             
             # Create progress bar for overall conversation processing
@@ -321,7 +323,7 @@ class StratifiedQualityAnalyzer:
                         ORDER BY {conversation_id_column}, {date_column}
                     """
                     
-                    # Execute with retry logic for connection issues
+                    # Execute with retry logic for connection issues and SQL variable limits
                     max_retries = 3
                     for retry in range(max_retries):
                         try:
@@ -329,7 +331,25 @@ class StratifiedQualityAnalyzer:
                             rows = cursor.fetchall()
                             break
                         except Exception as e:
-                            if retry < max_retries - 1:
+                            error_msg = str(e).lower()
+                            if "too many sql variables" in error_msg:
+                                print(f"\n⚠️  SQL variables limit hit with {len(batch_ids)} conversations. Splitting batch...")
+                                # Split batch in half and process separately
+                                mid = len(batch_ids) // 2
+                                rows = []
+                                for sub_batch in [batch_ids[:mid], batch_ids[mid:]]:
+                                    if sub_batch:
+                                        sub_conv_ids_str = "', '".join(str(cid) for cid in sub_batch)
+                                        sub_query = f"""
+                                            SELECT {conversation_id_column}, TEXT, {date_column}
+                                            FROM {table_name} 
+                                            WHERE {conversation_id_column} IN ('{sub_conv_ids_str}')
+                                            ORDER BY {conversation_id_column}, {date_column}
+                                        """
+                                        cursor.execute(sub_query)
+                                        rows.extend(cursor.fetchall())
+                                break
+                            elif retry < max_retries - 1:
                                 print(f"\n⚠️  Database error (retry {retry + 1}/{max_retries}): {e}")
                                 time.sleep(5)  # Wait 5 seconds before retry
                             else:
