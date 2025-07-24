@@ -29,6 +29,7 @@ s3transfer==0.13.1
 seaborn==0.13.2
 six==1.17.0
 snowflake-connector-python==3.16.0
+snowflake-connector-python[pandas]
 sortedcontainers==2.4.0
 tomlkit==0.13.3
 tqdm==4.67.1

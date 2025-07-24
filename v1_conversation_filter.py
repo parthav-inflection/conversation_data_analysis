@@ -33,7 +33,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def sample_and_process_conversations(limit=10000):
+def sample_and_process_conversations(limit=10):
     """
     Sample conversations from Snowflake and process them into a DataFrame.
     
@@ -47,7 +47,7 @@ def sample_and_process_conversations(limit=10000):
     
     conn = None
     try:
-        # Establish connection to Snowflake
+        # Establish connection to Snowflake using username/password
         conn = snowflake.connector.connect(
             user=SNOWFLAKE_USER,
             password=SNOWFLAKE_PASSWORD,
@@ -109,6 +109,11 @@ def sample_and_process_conversations(limit=10000):
             })
         
         df_conversations = pd.DataFrame(conversation_data)
+        
+        # Save full conversations to JSON for manual inspection
+        conversations_output_file = 'sampled_conversations.json'
+        df_conversations.to_json(conversations_output_file, orient='records', indent=2)
+        logger.info(f"Saved full conversations to {conversations_output_file} for manual inspection")
         
         unique_conversations = len(df_conversations)
         logger.info(f"Successfully processed {unique_conversations} unique conversations")
@@ -337,7 +342,7 @@ def main():
     logger.info("Starting conversation filter script...")
     
     # Define constants
-    SAMPLE_SIZE = 10000
+    SAMPLE_SIZE = 10
     LLM_RESULTS_FILE = 'llm_results.jsonl'
     ANALYSIS_RESULTS_FILE = 'analysis_results.json'
     
